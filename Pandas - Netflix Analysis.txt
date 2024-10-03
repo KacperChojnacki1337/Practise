@@ -1,0 +1,85 @@
+#sample dataset from Kaggle (Netflix)
+
+
+import pandas as pd
+import os
+from pandas.api.types import infer_dtype 
+import matplotlib.pyplot as plt
+import pandas_gbq
+import numpy as np
+
+
+# Import
+file_path = os.path.join("C:\\Users\\------\\Downloads","netflix_titles.csv")
+try:
+  df = pd.read_csv(file_path, encoding='unicode_escape') # Example with replace strategy
+  print("File read successfully!")
+except FileNotFoundError:
+  print("Error: File not found!")
+
+# Transform
+for col in df.columns:
+    if col.startswith('Unnamed'):
+        del df[col]      
+for col in df.columns:
+    typ_danych = infer_dtype(df[col])
+    if typ_danych == 'integer':
+        typ_danych = 'int64'
+    df[col] = df[col].astype(typ_danych)
+#print(df)   
+#print(df.info())
+
+#df filtering
+df_filtered = df[df["title"].str.contains("Naruto Shippuden the Movie: Blood Prison")]
+df_filtered = df_filtered.loc[:,["title","country"]]
+#print(df_filtered)
+
+# # Pivot1 - production types
+df['release_year']=pd.to_datetime(df['release_year'], format ="%Y")
+
+pivot_table = df.pivot_table(index=df["release_year"].dt.year,columns ="type",values="show_id",aggfunc="count", fill_value = 0)
+print(pivot_table)     
+
+#columnchart to Pivot1
+plt.figure(figsize=(15, 8))
+pivot_table.plot(kind="bar", width=0.8, color=["green", "blue"])
+x_labels = pivot_table.index.to_list()
+subsampled_labels = x_labels[::3]
+subsampled_ticks = range(0, len(x_labels), 3)  # Create tick positions for subsampled labels
+plt.xticks(ticks=subsampled_ticks, labels=subsampled_labels, fontsize=8)
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+#line chart to Pivot1
+plt.figure(figsize=(15, 8))
+lines = pivot_table.plot(kind="line",marker='o', color=["green", "blue"])
+x_labels = pivot_table.index.to_list()
+plt.ylabel('Ilość', fontsize=12, fontweight='bold', color='blue')
+plt.xlabel('Rok wydania', ha='right', x=1.05)  # Align x-axis label to the right
+plt.show()
+
+
+#Pivot2 - amount of production per country in 2021.
+filtered_year_2021 = pd.to_datetime('2021-01-01')
+df_filtered2 = df[df['release_year'].dt.year == filtered_year_2021.year]
+pivot_table2 = df_filtered2.pivot_table(index="country",columns =df["release_year"].dt.year,values="show_id",aggfunc="count",fill_value =0)
+pivot_table2_sorted = pivot_table2.sum(axis=1).sort_values(ascending=False)
+
+print(pivot_table2_sorted)
+#print(df_filtered_pivot2)
+
+#Pivot3 - number of productions per Actor and Director in 2021.
+
+def explode_actors_constructor(df_filtered2):
+  actors_list = df_filtered2['cast'].str.split(',')
+  exploded_df = pd.DataFrame(actors_list.explode()).join(df_filtered2.drop('cast', axis=1))
+  return exploded_df
+
+df_exploded = explode_actors_constructor(df_filtered2.copy())
+
+
+
+pivot_table3 = df_exploded.pivot_table(index=["cast"],columns =df["release_year"].dt.year,values="show_id",aggfunc="count",fill_value =0)
+pivot_table3_sorted = pivot_table3.sum(axis=1).sort_values(ascending=False)
+print(pivot_table3_sorted)
